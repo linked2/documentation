@@ -1,10 +1,5 @@
-﻿# DRAFT DOCUMENTATION
-Status: Unpublished
-
 Author: Rob Smith
-
 Version: 1.1
-
 Date: 1st Dec 2018
 
 # Linked2 Webhook Receivers
@@ -13,7 +8,7 @@ Webhook Receivers are used for receiving single documents for transformation, ba
 
 The Linked2 platform receives webhook integration requests. Webhooks originating from different SaaS platforms will differ for reasons of choice, design and requirements of the SaaS business. As such we will install a webhook receiver for your particular webhook headers and body.
 
-However, if you are considering developing a webhook and trigger on your SaaS application then we recommend the following method which is so common these days it can be considered a standard approach.
+However, if you are considering developing a webhook and trigger on your SaaS application then we recommend the following method which can be considered a standard approach.
 
 ## Quick Start
 We will assign you a webhook url with your subscription. It will be of the form `https://platform.linked2.io/api/webhooks/incoming/{clientName}/{id}`.
