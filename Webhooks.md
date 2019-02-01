@@ -1,36 +1,78 @@
 Author: Rob Smith
-Version: 1.1
-Date: 1st Dec 2018
+Version: 1.2
+Date: 31st Jan 2019
 
 # Linked2 Webhook Receivers
+Linked2 is a receiver of event data sent by webhooks. The webhook sends event data about something that has happened in your system, such as an order placement, an order update, or a customer creation. This is the primary method of sending live event data to Linked2 so that your integration running on the Linked2 platform can transform the event data and publish it to the intended target system. Because Linked2 is the receiver and because the source system is the sender it us upto you to define your webhook events as you see fit for your business. We will create a receiver (a connector) specifically for your webhook events. We expect usually a single receiver will be able to accept all your events, so long as you use the same HTTP header fields for each event. Using our connector framework we are typically able to build a receiver for your webhook events rapidly.
 
-Webhook Receivers are used for receiving single documents for transformation, batches should use the **Batch API**. There is a size limitation for the amount of data received by webhook.
+With the receiver in place on the Linked2 platform you will have a dedicated URL to post webhook events to. A URL of the form https://platform.linked2.io/api/webhooks/incoming/{yourname}/{id}
 
-The Linked2 platform receives webhook integration requests. Webhooks originating from different SaaS platforms will differ for reasons of choice, design and requirements of the SaaS business. As such we will install a webhook receiver for your particular webhook headers and body.
+## Linked2 Webhook Headers
 
-However, if you are considering developing a webhook and trigger on your SaaS application then we recommend the following method which can be considered a standard approach.
+When we build the reciever for your SaaS platform we will need details of your webhook HTTP headers as these will typically vary from system to system.
+
+In order for the Linked2 platform to deliver its full feature set and respond to only the relevant events you should include one header that uniquely identifies your customer and one header that identifies the event or topic.
+
+Here is an example of headers from a MyStore Webhook
+
+| Header Name              | Description
+| ------------------------ |-------------
+| X-no-mystore-topic       |The webhook topic that was triggered (e.g. orders/create) orders/update)
+| X-no-mystore-hmac-sha256 |An HMAC digest to verify the authenticity of the incoming webhook callback
+| X-no-mystore-host        |The name of the shop
+
+Similarly here is an example from Shopify
+
+| Header Name              | Description
+| ------------------------ |-------------
+| X-shopify-hmac-sha-256   |An HMAC digest (see below)  
+| X-shopify-test           |Denotes if a test or not
+| X-shopify-order-id       |The orderid
+| X-shopify-shop-domain    |The domain name of the shop
+| X-shopify-topic          |The webhook topic that was triggered (e.g. orders/create)  
+
+In these 2 examples we see a different use of headers, you choose how to create your webhooks.
+
+In the MyStore example the unique customer identifier is the X-No-Mystore-Host header. In the Shopify example this is the X-shopify-shop-domain header. We use the customer identifier to track your customers usage of the platform.
+
+The topic (or event) is identified almost the same in each. This allows us to respond only to events that should be sending data through Linked2 to your target system.
+
+Finally, a third header should include a method for allowing us to verify that the webhook came from you. The standard approach to this is to use an HMAC Digest calculated with a shared secret. We give you a secret to use with each customer. See below for more information on HMAC digest and shared secrets.
+
+Non-standard headers have been conventionally marked with a preceeding 'X-' but this is now a deprecated requirement and you are free to name without the 'X-' if you wish.
+
+In summary at you should provide a minimum of three headers:
+
+* A unique customer identifier, this can be an ID from your system, an organisation number, a domain, or anything that is unique to your customer.
+* A webhook topic (event name).
+* An HMAC digest for webhook origin verification.
+
+You are free to add other headers as you see fit and if necessary we will build the receiver to look at and respond to those headers.
+
+However, if you are developing a webhook and trigger on your SaaS application then we recommend the following method which can be considered a standard approach.
 
 ## Quick Start
 We will assign you a webhook url with your subscription. It will be of the form `https://platform.linked2.io/api/webhooks/incoming/{clientName}/{id}`.
 
 `{clientName}` will be your regsistered client name or an abbreviation of your client name, without spaces or hyphentations. `{id}` is the id that you will be given for each of your end-customers during the on-boarding process. See "Using the Linked2 Configuration API" for details on this. You must store this id from the on-boarding process.
 
-Make a POST request to that resource in which you should include at least two headers; the topic and the base64 encoded HMAC-SHA256 digest of the body of the request.
+Make a POST request to that resource in which you should include at least three headers; the unique customer identifier, the topic and the base64 encoded HMAC-SHA256 digest of the body of the request.
 
 The topic is the event that caused the webhook to fire.  Topic header data is typically structured as strings like this (but does not have to be):
 
-```
+```json
 customer/created
 customer/updated
 customer/deleted
 
 ```
 
-The HMAC-SHA256 digest is calculated from the body of the request with a shared secret. 
+The HMAC-SHA256 digest is calculated from the body of the request with a shared secret.
 
 You can calculate the HMAC like this:
 
 c#
+
 ```c#
 var key = Convert.FromBase64String(stage.Secret);
 string base64Hash = null;
@@ -45,18 +87,18 @@ using (var shaAlgorithm = new System.Security.Cryptography.HMACSHA256(key))
 Notice in .Net we use a disposable HMACSHA256 object, which is constructed with the shared secret key. If the key is base64 encoded remember to decode it first. Also that the body needs to be in the form of a byte array to compute the hash digest.
 
 php
+
 ```php
 
 $hmac_digest = base64_encode(hash_hmac('sha256', $body, $secret, $raw_output = true));
 ```
 
 Suggested header names:
-```
+
+```http
 X-{clientName}-Hmac-Sha256
 X-{clientName}-Topic
 ```
-
-Optionally include a header with the customer identifier that you used during this customers on-boarding process. See "Using the Linked2 Configuration API" for more informtion on this.
 
 `X-{clientName}-customerIdentfier`
 
@@ -87,6 +129,7 @@ Without access to the shared secret, if an attacker should intercept the webhook
 
 ## Request Body
 This can be any valid JSON. This is straight forward for simple business entities. Perhaps a simple product, or a simple contact with a single address. A contact record could look like this:
+
 ```json
 {
     "customer-number" : "01234567",
@@ -114,8 +157,27 @@ A JSON order may look something like this:
 ```json
 {
     "order-number" : "000123456",
-    "customer-id" : "000987234",
-    "invoice-address" : "000129992",
+    "customer" : {
+        "customer-id" : "000987234",
+        "business-name" : "Bishop Cheeses AS",
+        "organisation-nr" : "123 456 789",
+        "first-name" : "Simon",
+        "last-name" : "Pieman",
+        "invoice-address" : {
+            "address-id" : "124"
+            "street" : "102 Perdika Avenue",
+            "city" : "Mastricht",
+            "postcode" : "13321",
+            "country" : "NO"
+        },
+        "delivery-address" : {
+            "address-id" : "125"
+            "street" : "102 Perdika Avenue",
+            "city" : "Mastricht",
+            "postcode" : "13321",
+            "country" : "NO"
+        }
+    },
     "currency" : "NOK",
     "total-price" : 532.45,
     "order-lines" :  [
@@ -135,18 +197,11 @@ A JSON order may look something like this:
 }
 ```
 
-a JSON order object with an array of order line objects. Lets say we wish to send this to an accounting system. The issue here becomes the references for customer, invoice address and product, plus the relationships in the data. The order -> order lines relationship is presented but the relationship of order to customer, invoice address and order lines to products are not. We have only internal identifiers plus the sku in the case of the product and we assume that the customer entity referenced in the order has a relationship to an invoice address.
+There are nested objects and an array of objects, but the important thing here is we have structured data with  relationships. The transformation is able to see and map these relationships and create the structure and entities required by the target system.
 
-The issue here, of course, is if any of the related entities do not exist in the accounting system this order cannot be processed into the accounting system. If the customer or invoice address or any of the products do not exist then the order integration will fail.
+Getting the structure of your objects right, including relationships can be a difficult task when considering a broad API including webhooks.
 
-There are two strategies we can adopt to get around this.
-1) We can present all the customer, address and product objects in the JSON along with the relationship. In other words we can completely describe the business entity with all the data required.
-
-2) We can treat customer and product as seperate integrations and ensure those integrations are run first, before the order is run. Presumably we will have to cascade this down for any other relationships such as customer->address to get the invoice address.
-
-Clearly the 2nd option has issues with timing, workflow, failures, etc so the first option is preferable.
-
-Rather than re-invent the wheel for this we recommend you draw on the work done by [JSON API here](https://jsonapi.org/).
+Rather than re-invent the wheel for this we recommend you draw on the work done by [JSON API here](https://jsonapi.org/). But if you prefer not to that is, of course, no problem for Linked2.
 
 We are familiar with using JSON API which means we can develop your transformations drawing on experience of using this format and while it can look daunting there are [many JSON API tools available](https://jsonapi.org/implementations/) to help you convert your objects into JSON API format for sending. Using these tools will greatly simplify your coding and reduce your learning curve dramatically.
 
@@ -159,7 +214,7 @@ Webhook testing can be done in several ways, bear in mind that you don't need to
 
 Check out [ngrok for webhook testing](https://ngrok.com/); this tool will let you redirect your webhook to a localhost address which is especially useful during development. ngrok is our preferred way of testing webhooks.
 
-You can also find other tools available that are useful searching for webhook testing that will let you set up a temporary URL you can use and then via the website examine the body and headers of your webhook.
+You can also find other tools available that are useful. Searching for "webhook testing" you can find several sites that will let you set up a temporary URL you can use and then via the website examine the body and headers of your webhook event received at the temporary URL.
 
 ## Testing the Integration
 Consider setting up a test customer that you can use for this purpose. When you have a product completed and installed it for the test customer you will be in a position to test your webhook plus integration pipeline.
