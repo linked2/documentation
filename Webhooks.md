@@ -3,7 +3,12 @@ Version: 1.2
 Date: 31st Jan 2019
 
 # Linked2 Webhook Receivers
-Linked2 is a receiver of event data sent by webhooks. The webhook sends event data about something that has happened in your system, such as an order placement, an order update, or a customer creation. This is the primary method of sending live event data to Linked2 so that your integration running on the Linked2 platform can transform the event data and publish it to the intended target system. Because Linked2 is the receiver and because the source system is the sender it us upto you to define your webhook events as you see fit for your business. We will create a receiver (a connector) specifically for your webhook events. We expect usually a single receiver will be able to accept all your events, so long as you use the same HTTP header fields for each event. Using our connector framework we are typically able to build a receiver for your webhook events rapidly.
+Linked2 can receive any webhook from your system
+The webhook sends event data about something that has happened in your system, such as an order placement, an order update, or a customer creation. This is the primary method of sending live event data to Linked2.
+
+Because Linked2 is the receiver and because the source system is the sender it us upto you to define your webhook events as you see fit for your business. We will create a receiver (a connector) specifically for your webhook events. 
+
+We expect usually a single receiver will be able to accept all your events, so long as you use the same HTTP header fields for each event. Using our connector framework we are typically able to build a receiver for your webhook events rapidly.
 
 With the receiver in place on the Linked2 platform you will have a dedicated URL to post webhook events to. A URL of the form https://platform.linked2.io/api/webhooks/incoming/{yourname}/{id}
 
